@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>AgentOS Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <h1>AgentOS Performance Dashboard</h1>
+
+    <h2>Registered Agents</h2>
+    <ul id="agent-list"></ul>
+
+    <h2>Event Metrics</h2>
+    <canvas id="eventChart" width="400" height="200"></canvas>
+
+    <h2>Average Task Completion Time</h2>
+    <p id="avg-latency">Calculating...</p>
+
+    <h2>Accuracy</h2>
+    <p id="accuracy">N/A</p>
+
+    <h2>Resource Usage (Latest)</h2>
+    <table border="1">
+      <thead>
+        <tr><th>Agent</th><th>CPU %</th><th>Memory %</th></tr>
+      </thead>
+      <tbody id="resource-table-body"></tbody>
+    </table>
+
+    <script>
+    let chart;
+    async function updateDashboard() {
+        const d = await fetch('/data').then(r => r.json());
+
+        // Agents
+        const list = document.getElementById('agent-list');
+        list.innerHTML = '';
+        d.agents.forEach(a => {
+            const li = document.createElement('li');
+            li.textContent = `${a.name} (${a.status})`;
+            list.appendChild(li);
+        });
+
+        // Event chart
+        const ctx = document.getElementById('eventChart').getContext('2d');
+        if (chart) chart.destroy();
+        chart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ['Analysis Results', 'Workflow Events'],
+                datasets: [{ label: '# of Events', data: [d.analysis_events.length, d.workflow_events.length] }]
+            }
+        });
+
+        // Latency
+        document.getElementById('avg-latency').textContent =
+            d.avg_latency != null ? d.avg_latency.toFixed(3) + ' s' : 'N/A';
+
+        // Accuracy
+        document.getElementById('accuracy').textContent =
+            d.accuracy != null ? d.accuracy.toFixed(1) + ' %' : 'N/A';
+
+        // Resources
+        const tbody = document.getElementById('resource-table-body');
+        tbody.innerHTML = '';
+        for (const [agent, m] of Object.entries(d.resource_metrics)) {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${agent}</td>
+                <td>${m.cpu_percent.toFixed(1)}</td>
+                <td>${m.mem_percent.toFixed(1)}</td>
+            `;
+            tbody.appendChild(tr);
+        }
+    }
+
+    updateDashboard();
+    setInterval(updateDashboard, 5000);
+    </script>
+</body>
+</html>
